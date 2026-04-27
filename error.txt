@@ -1,0 +1,15 @@
+1 = seales add part this check , cash or naya
+2 = sales add karankota price eke aulk enawa
+3 = sales add eke gram gana eka hadanna ona
+4 = sales eke summary ekak widiyta pennana ona iteam eke kochara wikinilada labaya kohomada kiyala rate ekath ekak
+5 = set karanna widiyam tika ekathu karanna thenak
+
+
+
+--- Add sales walata set karanna ona drop down button ekak eke danna ona cash da check da nathnm 
+nayatada kiyala 
+data base eke aluth cloumn ekak add karanna ona okata 
+
+--- Payment method eke pennanne debit and check sales meke udin drop down ekak danawa all , check and debit 
+all display all sales (check and debit )
+check display only check 
