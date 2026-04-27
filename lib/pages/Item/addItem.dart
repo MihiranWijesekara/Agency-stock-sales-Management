@@ -15,6 +15,7 @@ class AddItemPage extends StatefulWidget {
 class _AddItemPageState extends State<AddItemPage> {
   final _formKey = GlobalKey<FormState>();
   final _itemNameController = TextEditingController();
+  String? _selectedUnit = 'Kg';
 
   @override
   void dispose() {
@@ -26,8 +27,9 @@ class _AddItemPageState extends State<AddItemPage> {
     if (_formKey.currentState!.validate()) {
       try {
         final itemName = _itemNameController.text;
+        final unit = _selectedUnit ?? '';
 
-        final newItem = ItemModel(name: itemName);
+        final newItem = ItemModel(name: itemName, unit: unit);
         final id = await DatabaseHelper.instance.insertItem(newItem);
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -37,7 +39,7 @@ class _AddItemPageState extends State<AddItemPage> {
           ),
         );
 
-        Navigator.pop(context, {'id': id, 'name': itemName});
+        Navigator.pop(context, {'id': id, 'name': itemName, 'unit': unit});
       } catch (e) {
         print('Error: $e'); // ✅ Print to console
         debugPrint('Error: ${e.toString()}'); // ✅ Better for debugging
@@ -160,6 +162,53 @@ class _AddItemPageState extends State<AddItemPage> {
                             return null;
                           },
                         ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Unit',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<String>(
+                          value: _selectedUnit,
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: const Color(0xFFF8F9FB),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: BorderSide.none,
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: BorderSide(
+                                color: Theme.of(context).primaryColor,
+                                width: 1.5,
+                              ),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 14,
+                            ),
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: 'Kg', child: Text('Kg')),
+                            DropdownMenuItem(value: 'pkt', child: Text('pkt')),
+                          ],
+                          onChanged: (value) {
+                            setState(() {
+                              _selectedUnit = value;
+                            });
+                          },
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please select unit';
+                            }
+                            return null;
+                          },
+                        ),
                       ],
                     ),
                   ),
@@ -179,9 +228,9 @@ class _AddItemPageState extends State<AddItemPage> {
                       ),
                       elevation: 2,
                     ),
-                    child: Row(
+                    child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
+                      children: [
                         Icon(Icons.save, color: Colors.white),
                         SizedBox(width: 8),
                         Text(

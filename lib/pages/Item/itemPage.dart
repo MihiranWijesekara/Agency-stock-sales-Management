@@ -44,7 +44,7 @@ class _ItemPageState extends State<ItemPage> {
   void _editItem(int index) async {
     final item = items[index];
     final nameController = TextEditingController(text: item.name);
-
+    final unitController = TextEditingController(text: item.unit);
 
     showDialog(
       context: context,
@@ -60,6 +60,14 @@ class _ItemPageState extends State<ItemPage> {
                 border: OutlineInputBorder(),
               ),
             ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: unitController,
+              decoration: const InputDecoration(
+                labelText: 'Unit',
+                border: OutlineInputBorder(),
+              ),
+            ),
           ],
         ),
         actions: [
@@ -70,10 +78,13 @@ class _ItemPageState extends State<ItemPage> {
           TextButton(
             onPressed: () async {
               final name = nameController.text.trim();
+              final unit = unitController.text.trim();
               if (name.isEmpty) return;
+              if (unit.isEmpty) return;
 
               final updatedItem = ItemModel(
                 id: item.id,
+                unit: unit,
                 name: name,
               );
 
@@ -158,7 +169,9 @@ class _ItemPageState extends State<ItemPage> {
         children: [
           SizedBox(width: 42, child: Text('No.', style: headerStyle)),
           Expanded(child: Text('Item Name', style: headerStyle)),
+
           const SizedBox(width: 8),
+          Expanded(child: Text('Unit', style: headerStyle)),
           SizedBox(
             width: 92,
             child: Text(
@@ -219,6 +232,18 @@ class _ItemPageState extends State<ItemPage> {
                 Expanded(
                   child: Text(
                     item.name,
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      color: Colors.grey[900],
+                      fontWeight: FontWeight.w600,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    item.unit,
                     style: TextStyle(
                       fontSize: 13.5,
                       color: Colors.grey[900],

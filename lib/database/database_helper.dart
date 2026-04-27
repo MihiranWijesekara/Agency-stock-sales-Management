@@ -24,7 +24,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 8, // bump version to ensure Sales.PaymentMethod migration runs
+      version: 9, // bump version to ensure items.unit migration runs
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
       onDowngrade: onDatabaseDowngradeDelete,
@@ -35,6 +35,7 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE items (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        unit TEXT NOT NULL,
         name TEXT NOT NULL
       )
     ''');
@@ -92,6 +93,16 @@ class DatabaseHelper {
   }
 
   Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 9) {
+      final itemColumns = await db.rawQuery('PRAGMA table_info(items)');
+      final hasUnit = itemColumns.any((c) => c['name'] == 'unit');
+      if (!hasUnit) {
+        await db.execute(
+          "ALTER TABLE items ADD COLUMN unit TEXT NOT NULL DEFAULT ''",
+        );
+      }
+    }
+
     if (oldVersion < 2) {
       await db.execute('''
         CREATE TABLE IF NOT EXISTS roots (
