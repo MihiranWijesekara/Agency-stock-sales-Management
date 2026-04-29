@@ -18,13 +18,21 @@ class _AddStockPageState extends State<AddStockPage> {
   final _stockRateController = TextEditingController();
   final _weightController = TextEditingController();
   final _amountController = TextEditingController();
-  final _qtyController = TextEditingController();
+  final _numberofpacksController = TextEditingController();
   final _dateController = TextEditingController();
   final _kgController = TextEditingController();
   final _gramController = TextEditingController();
   List<ItemModel> _items = [];
   int? _selectedItemId; // was String? _selectedItem
+  String? _selectedItemUnit;
   DateTime? _selectedDate;
+
+  bool get _isKgItem => _selectedItemUnit?.toLowerCase() == 'kg';
+
+  bool get _isPacketItem {
+    final unit = _selectedItemUnit?.toLowerCase() ?? '';
+    return unit == 'pkt' || unit == 'packet' || unit == 'number of packet';
+  }
 
   @override
   void dispose() {
@@ -33,7 +41,7 @@ class _AddStockPageState extends State<AddStockPage> {
     _stockRateController.dispose();
     _weightController.dispose();
     _amountController.dispose();
-    _qtyController.dispose();
+    _numberofpacksController.dispose();
     _dateController.dispose();
     super.dispose();
   }
@@ -51,6 +59,25 @@ class _AddStockPageState extends State<AddStockPage> {
     final items = await DatabaseHelper.instance.getAllItems();
     setState(() {
       _items = items;
+    });
+  }
+
+  void _handleSelectedItem(int? itemId) {
+    final selectedItem = _items.firstWhere(
+      (item) => item.id == itemId,
+      orElse: () => ItemModel(id: null, unit: '', name: ''),
+    );
+
+    setState(() {
+      _selectedItemId = itemId;
+      _selectedItemUnit = selectedItem.unit;
+
+      if (_isKgItem) {
+        _numberofpacksController.clear();
+      } else if (_isPacketItem) {
+        _kgController.clear();
+        _gramController.clear();
+      }
     });
   }
 
@@ -74,23 +101,33 @@ class _AddStockPageState extends State<AddStockPage> {
       final itemId = _selectedItemId;
       final stockRate = double.parse(_stockRateController.text);
       final sellingRate = double.parse(_sellingRateController.text);
-      // Calculate total grams from kg and gram fields
       final kg = int.tryParse(_kgController.text) ?? 0;
       final gram = int.tryParse(_gramController.text) ?? 0;
-      final weight = (kg * 1000) + gram;
+      final packetCount = int.tryParse(_numberofpacksController.text) ?? 0;
       final amount = double.tryParse(_amountController.text) ?? 0.0;
-      final qty = double.tryParse(_qtyController.text) ?? 0.0;
       final date = _dateController.text;
+
+      final isKgItem = _isKgItem;
+      final isPacketItem = _isPacketItem;
+
+      final quantityGrams = isKgItem ? (kg * 1000) + gram : null;
+      final numberOfPackets = isPacketItem ? packetCount : null;
+      final remainQuantity = isKgItem
+          ? quantityGrams?.toDouble()
+          : numberOfPackets?.toDouble();
+
+      final reamining_numberofpacks = isPacketItem ? packetCount : null;
 
       final newStock = StockModel(
         item_id: itemId!,
         stock_price: stockRate.toInt(),
         selling_price: sellingRate.toInt(),
-        quantity_grams: weight.toInt(),
+        quantity_grams: quantityGrams,
+        numberofpacks: numberOfPackets,
         amount: amount,
-        remain_quantity: weight.toInt().toDouble(),
-        QTY: qty,
+        remain_quantity: remainQuantity,
         added_date: date,
+        remainingNumberOfPack: reamining_numberofpacks,
       );
       await DatabaseHelper.instance.insertStock(newStock); // persist
 
@@ -230,16 +267,12 @@ class _AddStockPageState extends State<AddStockPage> {
                             return DropdownMenuItem<int>(
                               value: item.id,
                               child: Text(
-                                item.name,
+                                '${item.name} (${item.unit})',
                                 style: const TextStyle(fontSize: 14),
                               ),
                             );
                           }).toList(),
-                          onChanged: (int? newValue) {
-                            setState(() {
-                              _selectedItemId = newValue;
-                            });
-                          },
+                          onChanged: _handleSelectedItem,
                           validator: (value) {
                             if (value == null) {
                               return 'Please select an item';
@@ -348,7 +381,6 @@ class _AddStockPageState extends State<AddStockPage> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 12),
                 // Selling Rate Field
                 Container(
@@ -446,147 +478,233 @@ class _AddStockPageState extends State<AddStockPage> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 12),
-                // Weight Field
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.grey.withOpacity(0.08),
-                        spreadRadius: 0,
-                        blurRadius: 3,
-                        offset: const Offset(0, 1),
-                      ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Weight',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: const Color.fromARGB(255, 0, 0, 0),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextFormField(
-                                controller: _kgController,
-                                keyboardType: TextInputType.number,
-                                style: TextStyle(fontSize: 14),
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.digitsOnly,
-                                ],
-                                decoration: InputDecoration(
-                                  hintText: 'Kg',
-                                  hintStyle: TextStyle(
-                                    color: Colors.grey[400],
-                                    fontSize: 14,
-                                  ),
-                                  filled: true,
-                                  fillColor: const Color(0xFFF5F7FA),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(6),
-                                    borderSide: BorderSide(
-                                      color: Colors.black,
-                                      width: 1,
-                                    ),
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(6),
-                                    borderSide: BorderSide(
-                                      color: Colors.black,
-                                      width: 1,
-                                    ),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(6),
-                                    borderSide: BorderSide(
-                                      color: Colors.black,
-                                      width: 1.5,
-                                    ),
-                                  ),
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 10,
-                                  ),
-                                  isDense: true,
-                                ),
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'kg?';
-                                  }
-                                  if (int.tryParse(value) == null) {
-                                    return 'Invalid';
-                                  }
-                                  if (int.parse(value) < 0) {
-                                    return 'Invalid';
-                                  }
-                                  return null;
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: TextFormField(
-                                controller: _gramController,
-                                keyboardType: TextInputType.number,
-                                style: TextStyle(fontSize: 14),
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.digitsOnly,
-                                ],
-                                decoration: InputDecoration(
-                                  hintText: 'Gram',
-                                  hintStyle: TextStyle(
-                                    color: Colors.grey[400],
-                                    fontSize: 14,
-                                  ),
-                                  filled: true,
-                                  fillColor: const Color(0xFFF5F7FA),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(6),
-                                    borderSide: BorderSide(
-                                      color: Colors.black,
-                                      width: 1,
-                                    ),
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(6),
-                                    borderSide: BorderSide(
-                                      color: Colors.black,
-                                      width: 1,
-                                    ),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(6),
-                                    borderSide: BorderSide(
-                                      color: Colors.black,
-                                      width: 1.5,
-                                    ),
-                                  ),
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 10,
-                                  ),
-                                  isDense: true,
-                                ),
-                              ),
-                            ),
-                          ],
+                if (_isKgItem)
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.08),
+                          spreadRadius: 0,
+                          blurRadius: 3,
+                          offset: const Offset(0, 1),
                         ),
                       ],
                     ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Weight',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: const Color.fromARGB(255, 0, 0, 0),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextFormField(
+                                  controller: _kgController,
+                                  keyboardType: TextInputType.number,
+                                  style: TextStyle(fontSize: 14),
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                  ],
+                                  decoration: InputDecoration(
+                                    hintText: 'Kg',
+                                    hintStyle: TextStyle(
+                                      color: Colors.grey[400],
+                                      fontSize: 14,
+                                    ),
+                                    filled: true,
+                                    fillColor: const Color(0xFFF5F7FA),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(6),
+                                      borderSide: BorderSide(
+                                        color: Colors.black,
+                                        width: 1,
+                                      ),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(6),
+                                      borderSide: BorderSide(
+                                        color: Colors.black,
+                                        width: 1,
+                                      ),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(6),
+                                      borderSide: BorderSide(
+                                        color: Colors.black,
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 10,
+                                    ),
+                                    isDense: true,
+                                  ),
+                                  validator: (value) {
+                                    if (value == null || value.isEmpty) {
+                                      return 'kg?';
+                                    }
+                                    if (int.tryParse(value) == null) {
+                                      return 'Invalid';
+                                    }
+                                    if (int.parse(value) < 0) {
+                                      return 'Invalid';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: TextFormField(
+                                  controller: _gramController,
+                                  keyboardType: TextInputType.number,
+                                  style: TextStyle(fontSize: 14),
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                  ],
+                                  decoration: InputDecoration(
+                                    hintText: 'Gram',
+                                    hintStyle: TextStyle(
+                                      color: Colors.grey[400],
+                                      fontSize: 14,
+                                    ),
+                                    filled: true,
+                                    fillColor: const Color(0xFFF5F7FA),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(6),
+                                      borderSide: BorderSide(
+                                        color: Colors.black,
+                                        width: 1,
+                                      ),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(6),
+                                      borderSide: BorderSide(
+                                        color: Colors.black,
+                                        width: 1,
+                                      ),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(6),
+                                      borderSide: BorderSide(
+                                        color: Colors.black,
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 10,
+                                    ),
+                                    isDense: true,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.08),
+                          spreadRadius: 0,
+                          blurRadius: 3,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Number of Packets',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: const Color.fromARGB(255, 0, 0, 0),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          TextFormField(
+                            controller: _numberofpacksController,
+                            keyboardType: TextInputType.number,
+                            style: TextStyle(fontSize: 14),
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
+                            decoration: InputDecoration(
+                              hintText: 'Enter number of packets',
+                              hintStyle: TextStyle(
+                                color: Colors.grey[400],
+                                fontSize: 14,
+                              ),
+                              filled: true,
+                              fillColor: const Color(0xFFF5F7FA),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(6),
+                                borderSide: BorderSide(
+                                  color: Colors.black,
+                                  width: 1,
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(6),
+                                borderSide: BorderSide(
+                                  color: Colors.black,
+                                  width: 1,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(6),
+                                borderSide: BorderSide(
+                                  color: Colors.black,
+                                  width: 1.5,
+                                ),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 10,
+                              ),
+                              isDense: true,
+                            ),
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter number of packets';
+                              }
+                              if (int.tryParse(value) == null) {
+                                return 'Please enter a valid number';
+                              }
+                              if (int.parse(value) <= 0) {
+                                return 'Must be greater than 0';
+                              }
+                              return null;
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
 
                 const SizedBox(height: 12),
                 // Amount Field
@@ -679,83 +797,6 @@ class _AddStockPageState extends State<AddStockPage> {
                             }
                             return null;
                           },
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 12),
-                // QTY Field
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.grey.withOpacity(0.08),
-                        spreadRadius: 0,
-                        blurRadius: 3,
-                        offset: const Offset(0, 1),
-                      ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'QTY',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: const Color.fromARGB(255, 0, 0, 0),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        TextFormField(
-                          controller: _qtyController,
-                          keyboardType: TextInputType.number,
-                          style: TextStyle(fontSize: 14),
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                          ],
-                          decoration: InputDecoration(
-                            hintText: 'Enter quantity',
-                            hintStyle: TextStyle(
-                              color: Colors.grey[400],
-                              fontSize: 14,
-                            ),
-                            filled: true,
-                            fillColor: const Color(0xFFF5F7FA),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(6),
-                              borderSide: BorderSide(
-                                color: Colors.black,
-                                width: 1,
-                              ),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(6),
-                              borderSide: BorderSide(
-                                color: Colors.black,
-                                width: 1,
-                              ),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(6),
-                              borderSide: BorderSide(
-                                color: Colors.black,
-                                width: 1.5,
-                              ),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 10,
-                            ),
-                            isDense: true,
-                          ),
                         ),
                       ],
                     ),

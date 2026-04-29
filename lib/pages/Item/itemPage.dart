@@ -170,7 +170,7 @@ class _ItemPageState extends State<ItemPage> {
           SizedBox(width: 42, child: Text('No.', style: headerStyle)),
           Expanded(child: Text('Item Name', style: headerStyle)),
 
-          const SizedBox(width: 8),
+          const SizedBox(width: 12),
           Expanded(child: Text('Unit', style: headerStyle)),
           SizedBox(
             width: 92,
@@ -233,21 +233,21 @@ class _ItemPageState extends State<ItemPage> {
                   child: Text(
                     item.name,
                     style: TextStyle(
-                      fontSize: 13.5,
+                      fontSize: 12,
                       color: Colors.grey[900],
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w500,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 15),
                 Expanded(
                   child: Text(
                     item.unit,
                     style: TextStyle(
-                      fontSize: 13.5,
+                      fontSize: 12,
                       color: Colors.grey[900],
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w500,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),

@@ -24,7 +24,8 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 9, // bump version to ensure items.unit migration runs
+      version:
+          11, // bump version to apply Stock.remainingNumberOfPack migration
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
       onDowngrade: onDatabaseDowngradeDelete,
@@ -65,8 +66,9 @@ class DatabaseHelper {
         selling_price INTEGER NOT NULL,
         quantity_grams  INTEGER,           -- Total stock in grams
         remain_quantity INTEGER,           -- Remaining stock in grams
+        numberofpacks INTEGER,                -- NEW COLUMN for number of packs
+        remainingNumberOfPack INTEGER,     -- Remaining number of packs
         amount REAL DEFAULT 0,             -- NEW COLUMN
-        QTY REAL,
         added_date TEXT,
         FOREIGN KEY (item_id) REFERENCES items (id) ON DELETE SET NULL
       )
@@ -196,6 +198,28 @@ class DatabaseHelper {
       await db.execute(
         'ALTER TABLE Sales ADD COLUMN is_checked INTEGER DEFAULT 0',
       );
+    }
+
+    if (oldVersion < 10) {
+      final stockColumns = await db.rawQuery('PRAGMA table_info(Stock)');
+      final hasNumberOfPacks = stockColumns.any(
+        (c) => c['name'] == 'numberofpacks',
+      );
+      if (!hasNumberOfPacks) {
+        await db.execute('ALTER TABLE Stock ADD COLUMN numberofpacks INTEGER');
+      }
+    }
+
+    if (oldVersion < 11) {
+      final stockColumns = await db.rawQuery('PRAGMA table_info(Stock)');
+      final hasRemainingNumberOfPack = stockColumns.any(
+        (c) => c['name'] == 'remainingNumberOfPack',
+      );
+      if (!hasRemainingNumberOfPack) {
+        await db.execute(
+          'ALTER TABLE Stock ADD COLUMN remainingNumberOfPack INTEGER',
+        );
+      }
     }
   }
 

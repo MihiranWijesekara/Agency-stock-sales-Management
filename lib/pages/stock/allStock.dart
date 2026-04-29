@@ -820,7 +820,7 @@ class _AllstockState extends State<Allstock> {
               data: filteredStocks.map((stock) {
                 return [
                   stock.item_name ?? '',
-                  stock.QTY?.toStringAsFixed(1) ?? 'N/A',
+
                   stock.quantity_grams != null
                       ? (stock.quantity_grams! / 1000).toStringAsFixed(3)
                       : '0.000',

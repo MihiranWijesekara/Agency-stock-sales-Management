@@ -51,6 +51,11 @@ class _StockDisplayState extends State<StockDisplay> {
     }
   }
 
+  // Determine if stock should display as weight-based or packet-based
+  bool _isPacketMode(StockModel stock) {
+    return (stock.numberofpacks ?? 0) > 0;
+  }
+
   void _editStock(int index) async {
     final stock = stocks[index];
 
@@ -72,6 +77,12 @@ class _StockDisplayState extends State<StockDisplay> {
       text: stock.selling_price?.toString() ?? '',
     );
     final dateController = TextEditingController(text: stock.added_date ?? '');
+    final numberofpacksController = TextEditingController(
+      text: stock.numberofpacks?.toString() ?? '',
+    );
+    final remainingPacksController = TextEditingController(
+      text: stock.remainingNumberOfPack?.toString() ?? '',
+    );
 
     showDialog(
       context: context,
@@ -115,9 +126,18 @@ class _StockDisplayState extends State<StockDisplay> {
                 ),
                 const SizedBox(height: 12),
                 TextField(
+                  controller: numberofpacksController,
+                  decoration: const InputDecoration(
+                    labelText: 'Number of Packets',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 12),
+                TextField(
                   controller: rateController,
                   decoration: const InputDecoration(
-                    labelText: 'Rate',
+                    labelText: 'Stock Price (Per Kg)',
                     border: OutlineInputBorder(),
                   ),
                   keyboardType: TextInputType.number,
@@ -129,9 +149,18 @@ class _StockDisplayState extends State<StockDisplay> {
                 ),
                 const SizedBox(height: 12),
                 TextField(
+                  controller: sellingRateController,
+                  decoration: const InputDecoration(
+                    labelText: 'Selling Price (Per Kg)',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 12),
+                TextField(
                   controller: amountController,
                   decoration: const InputDecoration(
-                    labelText: 'Amount',
+                    labelText: 'Total Amount',
                     border: OutlineInputBorder(),
                   ),
                   readOnly: true,
@@ -140,7 +169,16 @@ class _StockDisplayState extends State<StockDisplay> {
                 TextField(
                   controller: remainController,
                   decoration: const InputDecoration(
-                    labelText: 'Remain Stock',
+                    labelText: 'Remaining Stock (Kg)',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: remainingPacksController,
+                  decoration: const InputDecoration(
+                    labelText: 'Remaining Packets',
                     border: OutlineInputBorder(),
                   ),
                   keyboardType: TextInputType.number,
@@ -191,6 +229,10 @@ class _StockDisplayState extends State<StockDisplay> {
                   remain_quantity: double.tryParse(remainController.text),
                   amount: double.tryParse(amountController.text),
                   added_date: dateController.text,
+                  numberofpacks: int.tryParse(numberofpacksController.text),
+                  remainingNumberOfPack: int.tryParse(
+                    remainingPacksController.text,
+                  ),
                 );
                 await DatabaseHelper.instance.updateStock(updated);
                 Navigator.pop(context);
@@ -486,65 +528,130 @@ class _StockDisplayState extends State<StockDisplay> {
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    Row(
-                      children: [
-                        Text(
-                          'Weight: ',
-                          style: TextStyle(
-                            fontSize: fontSizeSmall,
-                            color: Colors.grey[600],
-                            fontWeight: FontWeight.w500,
+                    // Weight and Amount Row (Weight Mode)
+                    if (!_isPacketMode(stock))
+                      Row(
+                        children: [
+                          Text(
+                            'Weight: ',
+                            style: TextStyle(
+                              fontSize: fontSizeSmall,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
-                        ),
-                        Text(
-                          '${stock.quantity_grams != null ? (stock.quantity_grams! / 1000).toStringAsFixed(3) : '0.000'} Kg',
-                          style: TextStyle(
-                            fontSize: fontSizeSmall,
-                            color: Colors.grey[900],
-                            fontWeight: FontWeight.w600,
+                          Text(
+                            '${stock.quantity_grams != null ? (stock.quantity_grams! / 1000).toStringAsFixed(3) : '0.000'} Kg',
+                            style: TextStyle(
+                              fontSize: fontSizeSmall,
+                              color: Colors.grey[900],
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
-                        ),
-                        SizedBox(width: padding * 0.5),
-                        Text(
-                          'Amount: ',
-                          style: TextStyle(
-                            fontSize: fontSizeSmall,
-                            color: Colors.grey[600],
-                            fontWeight: FontWeight.w500,
+                          SizedBox(width: padding * 0.5),
+                          Text(
+                            'Amount: ',
+                            style: TextStyle(
+                              fontSize: fontSizeSmall,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
-                        ),
-                        Text(
-                          'Rs ${stock.amount?.toStringAsFixed(0) ?? '0'}',
-                          style: TextStyle(
-                            fontSize: fontSizeSmall,
-                            color: Colors.green[700],
-                            fontWeight: FontWeight.w600,
+                          Text(
+                            'Rs ${stock.amount?.toStringAsFixed(0) ?? '0'}',
+                            style: TextStyle(
+                              fontSize: fontSizeSmall,
+                              color: Colors.green[700],
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
                     SizedBox(height: padding * 0.3),
-                    Row(
-                      children: [
-                        Text(
-                          'Remaining Stock: ',
-                          style: TextStyle(
-                            fontSize: fontSizeSmall,
-                            color: Colors.grey[600],
-                            fontWeight: FontWeight.w500,
+                    // Remaining Weight Row (Weight Mode)
+                    if (!_isPacketMode(stock))
+                      Row(
+                        children: [
+                          Text(
+                            'Remaining Weight: ',
+                            style: TextStyle(
+                              fontSize: fontSizeSmall,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
-                        ),
-                        Text(
-                          // '${stock.remain_quantity?.toStringAsFixed(1) ?? '0'} Kg',
-                          '${stock.remain_quantity != null ? (stock.remain_quantity! / 1000).toStringAsFixed(3) : '0.000'} Kg',
-                          style: TextStyle(
-                            fontSize: fontSizeSmall,
-                            color: Colors.orange[700],
-                            fontWeight: FontWeight.w600,
+                          Text(
+                            '${stock.remain_quantity != null ? (stock.remain_quantity! / 1000).toStringAsFixed(3) : '0.000'} Kg',
+                            style: TextStyle(
+                              fontSize: fontSizeSmall,
+                              color: Colors.orange[700],
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
+                    // Packets Row (Packet Mode)
+                    if (_isPacketMode(stock))
+                      Row(
+                        children: [
+                          Text(
+                            'Packets: ',
+                            style: TextStyle(
+                              fontSize: fontSizeSmall,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Text(
+                            '${stock.numberofpacks ?? 0}',
+                            style: TextStyle(
+                              fontSize: fontSizeSmall,
+                              color: Colors.grey[900],
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          SizedBox(width: padding * 1.5),
+                          Text(
+                            'Amount: ',
+                            style: TextStyle(
+                              fontSize: fontSizeSmall,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Text(
+                            'Rs ${stock.amount?.toStringAsFixed(0) ?? '0'}',
+                            style: TextStyle(
+                              fontSize: fontSizeSmall,
+                              color: Colors.green[700],
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    SizedBox(height: padding * 0.3),
+                    // Remaining Packets Row (Packet Mode)
+                    if (_isPacketMode(stock))
+                      Row(
+                        children: [
+                          Text(
+                            'Remaining Packets: ',
+                            style: TextStyle(
+                              fontSize: fontSizeSmall,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Text(
+                            '${stock.remainingNumberOfPack ?? 0}',
+                            style: TextStyle(
+                              fontSize: fontSizeSmall,
+                              color: Colors.blue[700],
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
                   ],
                 ),
               ),
@@ -553,74 +660,126 @@ class _StockDisplayState extends State<StockDisplay> {
           children: [
             Divider(height: 1, color: Colors.grey[200]),
             SizedBox(height: padding * 0.5),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildDetailItem(
-                    'QTY',
-                    stock.QTY?.toString() ?? '0',
-                    Icons.format_list_numbered,
-                    iconSize,
-                    fontSizeSmall,
-                    fontSizeSubtitle,
+            // WEIGHT MODE
+            if (!_isPacketMode(stock)) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildDetailItem(
+                      'Weight',
+                      '${stock.quantity_grams != null ? (stock.quantity_grams! / 1000).toStringAsFixed(3) : '0.000'} Kg',
+                      Icons.scale,
+                      iconSize,
+                      fontSizeSmall,
+                      fontSizeSubtitle,
+                    ),
                   ),
-                ),
-                Expanded(
-                  child: _buildDetailItem(
-                    'Weight',
-                    '${stock.quantity_grams != null ? (stock.quantity_grams! / 1000).toStringAsFixed(3) : '0.000'} Kg',
-                    Icons.scale,
-                    iconSize,
-                    fontSizeSmall,
-                    fontSizeSubtitle,
+                ],
+              ),
+              SizedBox(height: padding * 0.4),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildDetailItem(
+                      'Stock Price/Kg',
+                      'Rs ${stock.stock_price ?? 0}',
+                      Icons.scale,
+                      iconSize,
+                      fontSizeSmall,
+                      fontSizeSubtitle,
+                    ),
                   ),
-                ),
-              ],
-            ),
-            SizedBox(height: padding * 0.4),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildDetailItem(
-                    'Stock Rate',
-                    'Rs ${stock.stock_price ?? 0}',
-                    // sale.sellingPrice.toString(),
-                    Icons.attach_money,
-                    iconSize,
-                    fontSizeSmall,
-                    fontSizeSubtitle,
+                  Expanded(
+                    child: _buildDetailItem(
+                      'Selling Price/Kg',
+                      'Rs ${stock.selling_price ?? 0}',
+                      Icons.scale,
+                      iconSize,
+                      fontSizeSmall,
+                      fontSizeSubtitle,
+                    ),
                   ),
-                ),
-                Expanded(
-                  child: _buildDetailItem(
-                    'Selling Rate',
-                    'Rs ${stock.selling_price ?? 0}',
-                    Icons.attach_money,
-                    iconSize,
-                    fontSizeSmall,
-                    fontSizeSubtitle,
+                  Expanded(
+                    child: _buildDetailItem(
+                      'Total Amount',
+                      'Rs ${stock.amount?.toStringAsFixed(0) ?? '0'}',
+                      Icons.attach_money,
+                      iconSize,
+                      fontSizeSmall,
+                      fontSizeSubtitle,
+                    ),
                   ),
-                ),
-                Expanded(
-                  child: _buildDetailItem(
-                    'Amount',
-                    'Rs ${stock.amount?.toStringAsFixed(0) ?? '0'}',
-                    Icons.attach_money,
-                    iconSize,
-                    fontSizeSmall,
-                    fontSizeSubtitle,
+                ],
+              ),
+              SizedBox(height: padding * 0.4),
+              _buildDetailItemWithoutIcon(
+                'Remaining Weight',
+                '${stock.remain_quantity != null ? (stock.remain_quantity! / 1000).toStringAsFixed(3) : '0.000'} Kg',
+                fontSizeSmall,
+                fontSizeSubtitle,
+                padding,
+              ),
+            ],
+            // PACKET MODE
+            if (_isPacketMode(stock)) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildDetailItem(
+                      'Total Packets',
+                      '${stock.numberofpacks ?? 0}',
+                      Icons.inventory_2,
+                      iconSize,
+                      fontSizeSmall,
+                      fontSizeSubtitle,
+                    ),
                   ),
-                ),
-              ],
-            ),
-            SizedBox(height: padding * 0.4),
-            _buildDetailItemWithoutIcon(
-              'Remaining Stock',
-              '${stock.remain_quantity != null ? (stock.remain_quantity! / 1000).toStringAsFixed(3) : '0.000'} Kg',
-              fontSizeSmall,
-              fontSizeSubtitle,
-              padding,
-            ),
+                  Expanded(
+                    child: _buildDetailItem(
+                      'Remaining Packets',
+                      '${stock.remainingNumberOfPack ?? 0}',
+                      Icons.inventory,
+                      iconSize,
+                      fontSizeSmall,
+                      fontSizeSubtitle,
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: padding * 0.4),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildDetailItem(
+                      'Stock Price/Packet',
+                      'Rs ${stock.stock_price ?? 0}',
+                      Icons.attach_money,
+                      iconSize,
+                      fontSizeSmall,
+                      fontSizeSubtitle,
+                    ),
+                  ),
+                  Expanded(
+                    child: _buildDetailItem(
+                      'Selling Price/Packet',
+                      'Rs ${stock.selling_price ?? 0}',
+                      Icons.attach_money,
+                      iconSize,
+                      fontSizeSmall,
+                      fontSizeSubtitle,
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: padding * 0.4),
+              _buildDetailItemWithoutIcon(
+                'Total Amount',
+                'Rs ${stock.amount?.toStringAsFixed(0) ?? '0'}',
+                fontSizeSmall,
+                fontSizeSubtitle,
+                padding,
+              ),
+            ],
             SizedBox(height: padding),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
