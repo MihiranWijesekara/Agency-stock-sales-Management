@@ -24,8 +24,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version:
-          11, // bump version to apply Stock.remainingNumberOfPack migration
+      version: 12, // bump version to apply Sales.sellPacket migration
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
       onDowngrade: onDatabaseDowngradeDelete,
@@ -85,6 +84,7 @@ class DatabaseHelper {
         amount REAL DEFAULT 0,          
         Vat_Number TEXT,
         PaymentMethod TEXT,
+        sellPacket INTEGER,
         is_checked INTEGER DEFAULT 0,
         QTY INTEGER,
         added_date TEXT,
@@ -164,6 +164,7 @@ class DatabaseHelper {
           amount REAL DEFAULT 0,
           Vat_Number TEXT,
           PaymentMethod TEXT,
+          sellPacket INTEGER,
           is_checked INTEGER DEFAULT 0,
           added_date TEXT,
           FOREIGN KEY (item_id) REFERENCES items (id) ON DELETE SET NULL,
@@ -221,6 +222,14 @@ class DatabaseHelper {
         );
       }
     }
+
+    if (oldVersion < 12) {
+      final salesColumns = await db.rawQuery('PRAGMA table_info(Sales)');
+      final hasSellPacket = salesColumns.any((c) => c['name'] == 'sellPacket');
+      if (!hasSellPacket) {
+        await db.execute('ALTER TABLE Sales ADD COLUMN sellPacket INTEGER');
+      }
+    }
   }
 
   // Debug method to check if table exists
@@ -271,49 +280,96 @@ class DatabaseHelper {
 
     final int itemId = sale['item_id'] as int;
     num qtyToSell = (sale['quantity_grams'] ?? 0) as num;
+    num qtyToSellInPacks = (sale['sellPacket'] ?? 0) as num;
 
-    if (qtyToSell <= 0) {
+    if (qtyToSell <= 0 && qtyToSellInPacks <= 0) {
       throw Exception('Quantity must be greater than 0');
     }
 
     return await db.transaction<int>((txn) async {
-      final stockList = await txn.query(
-        'Stock',
-        where: 'item_id = ? AND COALESCE(remain_quantity, 0) > 0',
-        whereArgs: [itemId],
-        orderBy: 'added_date ASC, id ASC',
-      );
+      if (qtyToSell > 0) {
+        final stockList = await txn.query(
+          'Stock',
+          where: 'item_id = ? AND COALESCE(remain_quantity, 0) > 0',
+          whereArgs: [itemId],
+          orderBy: 'added_date ASC, id ASC',
+        );
 
-      for (var stock in stockList) {
-        final double remainQty = ((stock['remain_quantity'] ?? 0) as num)
-            .toDouble();
+        for (var stock in stockList) {
+          final double remainQty = ((stock['remain_quantity'] ?? 0) as num)
+              .toDouble();
 
-        if (remainQty >= qtyToSell) {
-          final newRemain = remainQty - qtyToSell;
+          if (remainQty >= qtyToSell) {
+            final newRemain = remainQty - qtyToSell;
 
-          await txn.update(
-            'Stock',
-            {'remain_quantity': newRemain},
-            where: 'id = ?',
-            whereArgs: [stock['id']],
-          );
+            await txn.update(
+              'Stock',
+              {'remain_quantity': newRemain},
+              where: 'id = ?',
+              whereArgs: [stock['id']],
+            );
 
-          qtyToSell = 0;
-          break;
-        } else {
-          qtyToSell -= remainQty;
+            qtyToSell = 0;
+            break;
+          } else {
+            qtyToSell -= remainQty;
 
-          await txn.update(
-            'Stock',
-            {'remain_quantity': 0},
-            where: 'id = ?',
-            whereArgs: [stock['id']],
-          );
+            await txn.update(
+              'Stock',
+              {'remain_quantity': 0},
+              where: 'id = ?',
+              whereArgs: [stock['id']],
+            );
+          }
+        }
+
+        if (qtyToSell > 0) {
+          throw Exception('Insufficient stock for item ID $itemId');
         }
       }
 
-      if (qtyToSell > 0) {
-        throw Exception('Insufficient stock for item ID $itemId');
+      if (qtyToSellInPacks > 0) {
+        final stockList = await txn.query(
+          'Stock',
+          where: 'item_id = ? AND COALESCE(remainingNumberOfPack, 0) > 0',
+          whereArgs: [itemId],
+          orderBy: 'added_date ASC, id ASC',
+        );
+
+        for (var stock in stockList) {
+          final double remainPacks =
+              ((stock['remainingNumberOfPack'] ?? 0) as num).toDouble();
+
+          if (remainPacks >= qtyToSellInPacks) {
+            final newRemain = remainPacks - qtyToSellInPacks;
+
+            await txn.update(
+              'Stock',
+              {
+                'remainingNumberOfPack': newRemain,
+                'remain_quantity': newRemain,
+              },
+              where: 'id = ?',
+              whereArgs: [stock['id']],
+            );
+
+            qtyToSellInPacks = 0;
+            break;
+          } else {
+            qtyToSellInPacks -= remainPacks;
+
+            await txn.update(
+              'Stock',
+              {'remainingNumberOfPack': 0, 'remain_quantity': 0},
+              where: 'id = ?',
+              whereArgs: [stock['id']],
+            );
+          }
+        }
+
+        if (qtyToSellInPacks > 0) {
+          throw Exception('Insufficient packet stock for item ID $itemId');
+        }
       }
 
       // ✅ correct amount: grams -> kg * pricePerKg
@@ -334,6 +390,7 @@ class DatabaseHelper {
         'amount',
         'Vat_Number',
         'PaymentMethod',
+        'sellPacket',
         'is_checked',
         'added_date',
         'QTY',

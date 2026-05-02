@@ -23,12 +23,25 @@ class _AddsalesState extends State<Addsales> {
   final _billNumberController = TextEditingController();
   final _vatController = TextEditingController();
   final _dateController = TextEditingController();
-  final _qtyController = TextEditingController(); // <-- Add this line
+  final _qtyController = TextEditingController();
   final _weightController = TextEditingController();
+  final _kgController = TextEditingController();
+  final _gramController = TextEditingController();
+  final _numberofpacksController = TextEditingController();
 
   DateTime? _selectedDate;
   int? _selectedItemId;
   String? _selectedPaymentMethod;
+  String? _selectedItemUnit;
+  bool _isKgItem = false;
+  bool _isPacketItem = false;
+
+  bool _matchesPacketUnit(String? unit) {
+    final normalizedUnit = unit?.toLowerCase().trim() ?? '';
+    return normalizedUnit == 'pkt' ||
+        normalizedUnit == 'packet' ||
+        normalizedUnit == 'number of packet';
+  }
 
   //stock model
   List<StockModel> _stockList = [];
@@ -70,6 +83,9 @@ class _AddsalesState extends State<Addsales> {
     _dateController.dispose();
     _qtyController.dispose();
     _weightController.dispose();
+    _kgController.dispose();
+    _gramController.dispose();
+    _numberofpacksController.dispose();
     super.dispose();
   }
 
@@ -168,13 +184,33 @@ class _AddsalesState extends State<Addsales> {
     }
   }
 
-  void _onItemSelected(int? itemId) {
-    if (itemId == null) return;
-    final stock = _getStockForItem(itemId);
+  void _handleSelectedItem(int? itemId) {
+    final selectedItem = _items.firstWhere(
+      (item) => item.id == itemId,
+      orElse: () => ItemModel(id: null, unit: '', name: ''),
+    );
+
+    final stock = _getStockForItem(itemId!);
+    final isKg =
+        selectedItem.unit?.toLowerCase() == 'kg' ||
+        selectedItem.unit?.isEmpty == true;
+    final isPacket = _matchesPacketUnit(selectedItem.unit);
+
     setState(() {
       _selectedItemId = itemId;
+      _selectedItemUnit = selectedItem.unit;
+      _isKgItem = isKg;
+      _isPacketItem = isPacket;
       _sellingRateController.text = (stock?.selling_price.toDouble() ?? 0)
           .toStringAsFixed(2);
+
+      // Clear input fields based on item type
+      if (isKg) {
+        _numberofpacksController.clear();
+      } else if (isPacket) {
+        _kgController.clear();
+        _gramController.clear();
+      }
     });
   }
 
@@ -212,48 +248,40 @@ class _AddsalesState extends State<Addsales> {
       return;
     }
 
-    if (_sellingRateController.text.isEmpty || _weightController.text.isEmpty) {
-      debugPrint('Selling rate or weight is empty.');
+    if (_sellingRateController.text.isEmpty) {
+      debugPrint('Selling rate is empty.');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please enter selling price and weight'),
+          content: Text('Please enter selling price'),
           backgroundColor: Colors.orange,
         ),
       );
       return;
     }
 
-    final weightText = _weightController.text.trim();
-    final weightPattern = RegExp(r'^\d+(\.\d{1,3})?$');
-    if (!weightPattern.hasMatch(weightText)) {
-      debugPrint('Invalid weight format: $weightText');
+    if (_isKgItem &&
+        _kgController.text.isEmpty &&
+        _gramController.text.isEmpty) {
+      debugPrint('Weight is empty for KG item.');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Enter weight like 2.500 (kg.gram)'),
+          content: Text('Please enter weight'),
           backgroundColor: Colors.orange,
         ),
       );
       return;
     }
 
-    final parts = weightText.split('.');
-    final kg = int.tryParse(parts[0]) ?? 0;
-    final gramsText = parts.length > 1 ? parts[1].padRight(3, '0') : '000';
-    final gram = int.tryParse(gramsText) ?? 0;
-    final weight = kg + (gram / 1000);
-
-    debugPrint('Parsed kg: $kg, gram: $gram, total weight: $weight');
-    if (weight <= 0) {
-      debugPrint('Weight <= 0');
+    if (_isPacketItem && _numberofpacksController.text.isEmpty) {
+      debugPrint('Packet count is empty for packet item.');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please enter a valid weight greater than 0'),
+          content: Text('Please enter number of packets'),
           backgroundColor: Colors.orange,
         ),
       );
       return;
     }
-    // Set the weightController for compatibility (if needed elsewhere)
 
     final stock = _getStockForItem(_selectedItemId!);
     final selectedItem = _items.firstWhere(
@@ -261,13 +289,48 @@ class _AddsalesState extends State<Addsales> {
     );
     final sellingPrice = double.tryParse(_sellingRateController.text) ?? 0;
     final originalPrice = stock?.selling_price.toDouble() ?? sellingPrice;
+
+    double weight = 0;
+    int? packetCount;
+
+    if (_isKgItem) {
+      final kg = int.tryParse(_kgController.text) ?? 0;
+      final gram = int.tryParse(_gramController.text) ?? 0;
+      weight = kg + (gram / 1000);
+
+      debugPrint('Parsed kg: $kg, gram: $gram, total weight: $weight');
+      if (weight <= 0) {
+        debugPrint('Weight <= 0');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please enter a valid weight greater than 0'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+    } else if (_isPacketItem) {
+      packetCount = int.tryParse(_numberofpacksController.text);
+      if (packetCount == null || packetCount <= 0) {
+        debugPrint('Invalid packet count');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please enter a valid packet count'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+      weight = packetCount.toDouble();
+    }
+
     final amount = sellingPrice * weight;
     final discount = (originalPrice > sellingPrice)
         ? (originalPrice - sellingPrice) * weight
         : 0.0;
 
     debugPrint(
-      'originalPrice: $originalPrice, sellingPrice: $sellingPrice, amount: $amount, discount: $discount',
+      'originalPrice: $originalPrice, sellingPrice: $sellingPrice, weight: $weight, packets: $packetCount, amount: $amount, discount: $discount',
     );
 
     setState(() {
@@ -280,13 +343,20 @@ class _AddsalesState extends State<Addsales> {
           weight: weight,
           amount: amount,
           discount: discount,
+          packetCount: packetCount,
         ),
       );
 
       // Clear fields
       _selectedItemId = null;
+      _selectedItemUnit = null;
+      _isKgItem = false;
+      _isPacketItem = false;
       _sellingRateController.clear();
       _weightController.clear();
+      _kgController.clear();
+      _gramController.clear();
+      _numberofpacksController.clear();
     });
 
     debugPrint('Cart items count: ${_cartItems.length}');
@@ -397,40 +467,41 @@ class _AddsalesState extends State<Addsales> {
         'Saving sales: billNo=$billNumber, date=$date, vat=$vatNumber, paymentMethod=$paymentMethod',
       );
       for (var cartItem in _cartItems) {
-        final int qtyGrams = (cartItem.weight * 1000)
-            .round(); // ✅ convert kg -> grams
+        int? qtyGrams;
+        int? packets;
 
-        if (qtyGrams <= 0) {
-          throw Exception('Invalid quantity (grams). Check KG/Gram inputs.');
+        if (cartItem.packetCount != null && cartItem.packetCount! > 0) {
+          // Packet-based item
+          packets = cartItem.packetCount;
+        } else {
+          // Weight-based item: convert kg -> grams
+          qtyGrams = (cartItem.weight * 1000).round();
+          if (qtyGrams <= 0) {
+            throw Exception('Invalid quantity (grams). Check KG/Gram inputs.');
+          }
         }
 
         final newSales = Salesmodel(
           billNo: billNumber,
           shopId: _selectedShop!.id,
           itemId: cartItem.itemId,
-
-          // store as int if your DB column is int (price per KG)
           sellingPrice: cartItem.sellingPrice.toInt(),
-
-          // ❌ don't do this: cartItem.weight.toInt()
-          // ✅ instead pass grams through map (see below)
-          quantityKg: cartItem.weight
-              .toInt(), // convert double to int for quantityKg
-
+          quantityKg: qtyGrams,
           amount: cartItem.amount,
           vatNumber: vatNumber,
           paymentMethod: paymentMethod,
           addedDate: date,
           qty: int.tryParse(_qtyController.text),
+          sellPacket: packets,
         );
 
         final saleMap = newSales.toMap();
 
-        // ✅ this is what insertSaleFIFO expects
-        saleMap['quantity_grams'] = qtyGrams;
+        // Set quantity_grams (0 for packet items)
+        saleMap['quantity_grams'] = qtyGrams ?? 0;
+        saleMap['sellPacket'] = packets ?? 0;
 
-        // ✅ make sure these keys match your DB columns
-        // If your Sales table expects item_id / selling_price, ensure these exist:
+        // Ensure these keys match DB columns
         saleMap['item_id'] = cartItem.itemId;
         saleMap['selling_price'] = cartItem.sellingPrice.toInt();
         saleMap['PaymentMethod'] = paymentMethod;
@@ -552,8 +623,7 @@ class _AddsalesState extends State<Addsales> {
             _buildSellingPriceField(),
             const SizedBox(height: 10),
             _buildWeightField(),
-            const SizedBox(height: 10),
-            _buildQTYField(),
+            if (_isKgItem) ...[const SizedBox(height: 10), _buildQTYField()],
             const SizedBox(height: 1),
             SizedBox(
               width: double.infinity,
@@ -1078,7 +1148,7 @@ class _AddsalesState extends State<Addsales> {
             const SizedBox(height: 6),
             DropdownButtonFormField<int>(
               value: _selectedItemId,
-              onChanged: _onItemSelected,
+              onChanged: _handleSelectedItem,
               decoration: InputDecoration(
                 hintText: 'Select Item',
                 filled: true,
@@ -1158,85 +1228,205 @@ class _AddsalesState extends State<Addsales> {
   }
 
   Widget _buildWeightField() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.08),
-            spreadRadius: 0,
-            blurRadius: 3,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Weight',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: const Color.fromARGB(255, 0, 0, 0),
-              ),
-            ),
-            const SizedBox(height: 6),
-            TextFormField(
-              controller: _weightController,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              style: TextStyle(fontSize: 14),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-                LengthLimitingTextInputFormatter(8),
-              ],
-              decoration: InputDecoration(
-                hintText: '2.500',
-                suffixText: 'kg',
-                helperText: 'Format: kg.gram (e.g. 2.500 = 2kg 500g)',
-                hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
-                filled: true,
-                fillColor: const Color(0xFFF5F7FA),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(6),
-                  borderSide: BorderSide(color: Colors.black, width: 1),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(6),
-                  borderSide: BorderSide(color: Colors.black, width: 1),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(6),
-                  borderSide: BorderSide(color: Colors.black, width: 1.5),
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 10,
-                ),
-                isDense: true,
-              ),
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Enter weight';
-                }
-                final valid = RegExp(
-                  r'^\d+(\.\d{1,3})?$',
-                ).hasMatch(value.trim());
-                if (!valid) {
-                  return 'Use 2.500 format';
-                }
-                return null;
-              },
+    if (_isKgItem) {
+      return Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.08),
+              spreadRadius: 0,
+              blurRadius: 3,
+              offset: const Offset(0, 1),
             ),
           ],
         ),
-      ),
-    );
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Weight',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: const Color.fromARGB(255, 0, 0, 0),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _kgController,
+                      keyboardType: TextInputType.number,
+                      style: TextStyle(fontSize: 14),
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      decoration: InputDecoration(
+                        hintText: 'Kg',
+                        hintStyle: TextStyle(
+                          color: Colors.grey[400],
+                          fontSize: 14,
+                        ),
+                        filled: true,
+                        fillColor: const Color(0xFFF5F7FA),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(6),
+                          borderSide: BorderSide(color: Colors.black, width: 1),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(6),
+                          borderSide: BorderSide(color: Colors.black, width: 1),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(6),
+                          borderSide: BorderSide(
+                            color: Colors.black,
+                            width: 1.5,
+                          ),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        isDense: true,
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'kg?';
+                        }
+                        if (int.tryParse(value) == null) {
+                          return 'Invalid';
+                        }
+                        if (int.parse(value) < 0) {
+                          return 'Invalid';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _gramController,
+                      keyboardType: TextInputType.number,
+                      style: TextStyle(fontSize: 14),
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      decoration: InputDecoration(
+                        hintText: 'Gram',
+                        hintStyle: TextStyle(
+                          color: Colors.grey[400],
+                          fontSize: 14,
+                        ),
+                        filled: true,
+                        fillColor: const Color(0xFFF5F7FA),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(6),
+                          borderSide: BorderSide(color: Colors.black, width: 1),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(6),
+                          borderSide: BorderSide(color: Colors.black, width: 1),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(6),
+                          borderSide: BorderSide(
+                            color: Colors.black,
+                            width: 1.5,
+                          ),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    } else if (_isPacketItem) {
+      return Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.08),
+              spreadRadius: 0,
+              blurRadius: 3,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Number of Packets',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: const Color.fromARGB(255, 0, 0, 0),
+                ),
+              ),
+              const SizedBox(height: 6),
+              TextFormField(
+                controller: _numberofpacksController,
+                keyboardType: TextInputType.number,
+                style: TextStyle(fontSize: 14),
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: InputDecoration(
+                  hintText: 'Enter number of packets',
+                  hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
+                  filled: true,
+                  fillColor: const Color(0xFFF5F7FA),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: BorderSide(color: Colors.black, width: 1),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: BorderSide(color: Colors.black, width: 1),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: BorderSide(color: Colors.black, width: 1.5),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  isDense: true,
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter number of packets';
+                  }
+                  if (int.tryParse(value) == null) {
+                    return 'Please enter a valid number';
+                  }
+                  if (int.parse(value) <= 0) {
+                    return 'Must be greater than 0';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
+        ),
+      );
+    } else {
+      return const SizedBox.shrink();
+    }
   }
 
   Widget _buildQTYField() {
@@ -1290,6 +1480,13 @@ class _AddsalesState extends State<Addsales> {
 
   Widget _buildCartItem(int index) {
     final item = _cartItems[index];
+    final isPacketItem = item.packetCount != null;
+    final quantityLabel = isPacketItem
+        ? '${item.packetCount} packets'
+        : '${item.weight.toStringAsFixed(2)} kg';
+    final priceLabel = isPacketItem
+        ? 'RS ${item.sellingPrice.toStringAsFixed(2)}/packet'
+        : 'RS ${item.sellingPrice.toStringAsFixed(2)}/kg';
     return Card(
       margin: const EdgeInsets.only(bottom: 8), // less margin
       elevation: 1,
@@ -1328,7 +1525,7 @@ class _AddsalesState extends State<Addsales> {
             Row(
               children: [
                 Text(
-                  'RS ${item.sellingPrice.toStringAsFixed(2)}/kg',
+                  priceLabel,
                   style: TextStyle(
                     fontSize: 11, // reduced font size
                     color: Colors.grey[600],
@@ -1336,7 +1533,7 @@ class _AddsalesState extends State<Addsales> {
                 ),
                 const SizedBox(width: 10), // less spacing
                 Text(
-                  '× ${item.weight.toStringAsFixed(2)} kg',
+                  '× $quantityLabel',
                   style: TextStyle(
                     fontSize: 11, // reduced font size
                     color: Colors.grey[600],
@@ -1357,31 +1554,13 @@ class _AddsalesState extends State<Addsales> {
                     color: Color.fromARGB(255, 26, 11, 167),
                   ),
                 ),
-                SizedBox(
-                  width: 80, // reduced width
-                  child: TextFormField(
-                    initialValue: item.weight.toStringAsFixed(2),
-                    keyboardType: TextInputType.number,
-                    style: const TextStyle(fontSize: 11), // reduced font size
-                    decoration: InputDecoration(
-                      labelText: 'Weight',
-                      labelStyle: const TextStyle(fontSize: 11),
-                      suffixText: 'kg',
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 6,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(5),
-                      ),
-                      isDense: true,
-                    ),
-                    onChanged: (value) {
-                      final newWeight = double.tryParse(value);
-                      if (newWeight != null && newWeight > 0) {
-                        _updateCartItem(index, newWeight);
-                      }
-                    },
+                Text(
+                  isPacketItem
+                      ? '${item.packetCount ?? 0} pkt'
+                      : item.weight.toStringAsFixed(2),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],

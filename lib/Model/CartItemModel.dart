@@ -7,6 +7,7 @@ class CartItem {
   double weight;
   double amount;
   double discount; // Add this
+  int? packetCount;
 
   CartItem({
     required this.itemId,
@@ -16,6 +17,7 @@ class CartItem {
     required this.weight,
     required this.amount,
     required this.discount,
+    this.packetCount,
   });
 
   Map<String, dynamic> toMap() {
@@ -27,6 +29,7 @@ class CartItem {
       'weight': weight,
       'amount': amount,
       'discount': discount,
+      'packetCount': packetCount,
     };
   }
 
@@ -39,6 +42,7 @@ class CartItem {
       weight: map['weight'],
       amount: map['amount'],
       discount: map['discount'],
+      packetCount: map['packetCount'],
     );
   }
 }

@@ -12,6 +12,7 @@ class Salesmodel {
   final String? addedDate;
   final String? shopName;
   final int? qty;
+  final int? sellPacket;
 
   Salesmodel({
     this.id,
@@ -27,6 +28,7 @@ class Salesmodel {
     this.addedDate,
     this.shopName,
     this.qty,
+    this.sellPacket,
   });
 
   // Convert to Map for database
@@ -44,6 +46,7 @@ class Salesmodel {
       'is_checked': isChecked,
       'added_date': addedDate,
       'QTY': qty,
+      'sellPacket': sellPacket,
     };
   }
 
@@ -63,6 +66,7 @@ class Salesmodel {
       addedDate: map['added_date'],
       shopName: map['shop_name'],
       qty: map['QTY'],
+      sellPacket: map['sellPacket'],
     );
   }
 }
