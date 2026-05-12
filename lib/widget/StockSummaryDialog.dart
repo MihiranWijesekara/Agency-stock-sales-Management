@@ -18,7 +18,7 @@ class StockSummaryDialog extends StatelessWidget {
     double totalWeight = 0;
     for (var stock in stocks) {
       if (stock.quantity_grams != null) {
-        totalWeight += stock.quantity_grams!;
+        totalWeight += stock.quantity_grams!.toDouble();
       }
     }
     return totalWeight / 1000; // Convert to Kg
@@ -28,25 +28,34 @@ class StockSummaryDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final totalWeightKg = _calculateTotalWeight();
 
-    // Group stocks by item_id and calculate total quantity
+    // Group stocks by item_id and calculate total quantity and packet counts
     final groupedStocks = groupBy(stocks, (StockModel stock) => stock.item_id);
     final List<Widget> stockWidgets = groupedStocks.entries.map((entry) {
       final itemId = entry.key;
       final itemStocks = entry.value;
-      final totalQuantity =
-          itemStocks.fold(
-            0,
-            (sum, stock) => sum + (stock.quantity_grams ?? 0),
-          ) /
-          1000;
-      final itemName =
-          itemStocks.first.item_name ??
-          'Unknown Item'; // Assuming item_name is consistent
 
-      return ListTile(
-        title: Text(itemName),
-        subtitle: Text('Total Stock: ${totalQuantity} Kg'),
-      );
+      final totalGrams = itemStocks.fold<double>(0.0, (sum, stock) {
+        return sum + ((stock.quantity_grams ?? 0).toDouble());
+      });
+
+      final totalPackets = itemStocks.fold<int>(0, (sum, stock) {
+        return sum + (stock.numberofpacks ?? 0);
+      });
+
+      final totalWeightKg = totalGrams / 1000;
+      final itemName = itemStocks.first.item_name ?? 'Unknown Item';
+
+      String subtitle;
+      if (totalPackets > 0 && totalWeightKg > 0) {
+        subtitle =
+            'Total Stock: ${totalWeightKg.toStringAsFixed(2)} Kg, ${totalPackets} P';
+      } else if (totalPackets > 0) {
+        subtitle = 'Total Stock: ${totalPackets} P';
+      } else {
+        subtitle = 'Total Stock: ${totalWeightKg.toStringAsFixed(2)} Kg';
+      }
+
+      return ListTile(title: Text(itemName), subtitle: Text(subtitle));
     }).toList();
 
     return Dialog(
@@ -62,36 +71,6 @@ class StockSummaryDialog extends StatelessWidget {
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 20),
-            // Summary Row
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                Column(
-                  children: [
-                    const SizedBox(height: 10),
-                    const Text(
-                      'Total Weight',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: Color.fromARGB(255, 54, 54, 54),
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      '${totalWeightKg.toStringAsFixed(2)} Kg',
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Color.fromARGB(255, 26, 11, 167),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 5),
-            // Item List
             const Align(
               alignment: Alignment.centerLeft,
               child: Text(

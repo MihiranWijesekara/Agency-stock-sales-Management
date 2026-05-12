@@ -913,8 +913,8 @@ class DatabaseHelper {
 
     String paddedMonth = month.toString().padLeft(2, '0');
     String yyyy = year.toString();
-    String like1 = '%/$paddedMonth/$yyyy%'; // matches DD/MM/YYYY
-    String like2 = '%/$month/$yyyy%'; // matches D/M/YYYY
+    String like1 = '%/$paddedMonth/$yyyy%'; 
+    String like2 = '%/$month/$yyyy%'; 
 
     // Get all items
     final items = await db.query('items');

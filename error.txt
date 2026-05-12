@@ -1,6 +1,6 @@
-1 - all stock page packet correctly not display weight
+1 - all stock page packet correctly not display weight  = Done
 
-2 - All stock page  stock summary section pack count not display
+2 - All stock page  stock summary section pack count not display = Done
 
 3 - Report page stock and sold section packet count not display 
 
