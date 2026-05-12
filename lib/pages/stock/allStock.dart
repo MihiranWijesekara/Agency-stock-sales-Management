@@ -61,6 +61,25 @@ class _AllstockState extends State<Allstock> {
     });
   }
 
+  bool _isPacketMode(StockModel stock) {
+    final item = _items.where((item) => item.id == stock.item_id).toList();
+    if (item.isNotEmpty) {
+      final unit = item.first.unit.trim().toLowerCase();
+      if (unit == 'packet' || unit == 'packets' || unit == 'p') {
+        return true;
+      }
+    }
+    return (stock.numberofpacks ?? 0) > 0;
+  }
+
+  String _formatQuantity(StockModel stock) {
+    if (_isPacketMode(stock)) {
+      return '${stock.numberofpacks ?? 0}P';
+    }
+
+    return '${stock.quantity_grams != null ? (stock.quantity_grams! / 1000).toStringAsFixed(3) : '0.000'} Kg';
+  }
+
   Future<void> _loadItems() async {
     try {
       final data = await DatabaseHelper.instance.getAllItems();
@@ -502,7 +521,7 @@ class _AllstockState extends State<Allstock> {
                         SizedBox(
                           width: 50,
                           child: Text(
-                            'Weight',
+                            'Qty',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 10,
@@ -645,7 +664,7 @@ class _AllstockState extends State<Allstock> {
                                 SizedBox(
                                   width: 45,
                                   child: Text(
-                                    '${stock.quantity_grams != null ? (stock.quantity_grams! / 1000).toStringAsFixed(3) : '0.000'} Kg',
+                                    _formatQuantity(stock),
                                     style: const TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.w600,
@@ -816,14 +835,19 @@ class _AllstockState extends State<Allstock> {
             pw.Text('Stock List', style: pw.TextStyle(fontSize: 24)),
             pw.SizedBox(height: 20),
             pw.Table.fromTextArray(
-              headers: ['Item', 'QTY', 'Weight (Kg)', 'Rate', 'Amount', 'Date'],
+              headers: [
+                'Item',
+                'QTY',
+                'Qty / Weight',
+                'Rate',
+                'Amount',
+                'Date',
+              ],
               data: filteredStocks.map((stock) {
                 return [
                   stock.item_name ?? '',
 
-                  stock.quantity_grams != null
-                      ? (stock.quantity_grams! / 1000).toStringAsFixed(3)
-                      : '0.000',
+                  _formatQuantity(stock),
                   stock.stock_price.toString(),
                   stock.amount?.toStringAsFixed(2) ?? 'N/A',
                   stock.added_date ?? '',

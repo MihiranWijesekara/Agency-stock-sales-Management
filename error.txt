@@ -1,16 +1,8 @@
-stock display eke packet eka wenama display karanna ona mn hithana widiyata ekata wenama
-rmaning  packet kiyala coloumn ekak hadaannaa weanwa 
+1 - all stock page packet correctly not display weight
 
-kg tika me widiytama pennanna ona
+2 - All stock page  stock summary section pack count not display
 
+3 - Report page stock and sold section packet count not display 
 
+4 - sales page QTY section not display packet sell count
 
-Change pages 
-currentStcokDisplay page
-allStock page
-
-
-allSales page
-montlySales page
-todaySales page
-weeklySales page
