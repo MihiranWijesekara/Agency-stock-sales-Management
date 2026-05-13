@@ -511,6 +511,7 @@ class DatabaseHelper {
     );
 
     print('✅ Found ${result.length} records'); // Debug
+    print('✅ Found ${result} records');
     return result;
   }
 
@@ -611,7 +612,7 @@ class DatabaseHelper {
     // For each sale today, get the latest stock_price for the item
     final rows = await db.rawQuery(
       '''
-      SELECT S.selling_price, S.quantity_grams AS quantity_grams, St.stock_price
+      SELECT S.selling_price, S.quantity_grams AS quantity_grams, S.sellPacket, St.stock_price
       FROM Sales S
       LEFT JOIN (
         SELECT item_id, MAX(id) as max_stock_id
@@ -628,7 +629,11 @@ class DatabaseHelper {
       final sellingPrice = (row['selling_price'] ?? 0) as num;
       final stockPrice = (row['stock_price'] ?? 0) as num;
       final qtyGrams = (row['quantity_grams'] ?? 0) as num;
-      final profit = (sellingPrice - stockPrice) * (qtyGrams / 1000.0);
+      final sellPacket = (row['sellPacket'] ?? 0) as num;
+      final qtyUnits = (sellPacket > 0)
+          ? sellPacket.toDouble()
+          : (qtyGrams.toDouble() / 1000.0);
+      final profit = (sellingPrice - stockPrice) * qtyUnits;
       totalProfit += profit;
     }
     return totalProfit;
@@ -725,7 +730,12 @@ class DatabaseHelper {
     final unpadded = '${now.day}/${now.month}/${now.year}';
     final rows = await db.rawQuery(
       '''
-    SELECT IFNULL(SUM(amount),0) AS total_amount
+    SELECT IFNULL(SUM(
+      CASE
+        WHEN COALESCE(sellPacket, 0) > 0 THEN (sellPacket * selling_price)
+        ELSE (CAST(quantity_grams AS REAL) / 1000.0) * selling_price
+      END
+    ),0) AS total_amount
     FROM Sales
     WHERE added_date = ? OR added_date = ?
   ''',
@@ -913,8 +923,8 @@ class DatabaseHelper {
 
     String paddedMonth = month.toString().padLeft(2, '0');
     String yyyy = year.toString();
-    String like1 = '%/$paddedMonth/$yyyy%'; 
-    String like2 = '%/$month/$yyyy%'; 
+    String like1 = '%/$paddedMonth/$yyyy%';
+    String like2 = '%/$month/$yyyy%';
 
     // Get all items
     final items = await db.query('items');

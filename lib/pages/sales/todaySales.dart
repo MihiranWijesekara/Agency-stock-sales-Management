@@ -75,6 +75,24 @@ class _TodaysalesState extends State<Todaysales> {
     return grouped;
   }
 
+  // Compute display amount for a sale (handles packet sales and weight sales)
+  double _computeSaleAmount(Salesmodel sale) {
+    final int packets = sale.sellPacket ?? 0;
+    if (packets > 0) {
+      return packets * (sale.sellingPrice.toDouble());
+    }
+    final num grams = sale.quantityKg ?? 0;
+    return (grams / 1000.0) * sale.sellingPrice;
+  }
+
+  // Compute display text for quantity (packets vs kg)
+  String _computeQtyText(Salesmodel sale) {
+    final int packets = sale.sellPacket ?? 0;
+    if (packets > 0) return '$packets pkt';
+    final num grams = sale.quantityKg ?? 0;
+    return '${(grams / 1000.0).toStringAsFixed(2)} kg';
+  }
+
   // Get item name by ID
   String _getItemName(int? itemId) {
     if (itemId == null) return 'Unknown';
@@ -98,8 +116,7 @@ class _TodaysalesState extends State<Todaysales> {
       text: sale.sellingPrice.toString(),
     );
     final amountController = TextEditingController(
-      text: (sale.amount ?? (sale.sellingPrice * (sale.quantityKg ?? 0)))
-          .toString(),
+      text: _computeSaleAmount(sale).toStringAsFixed(2),
     );
     final dateController = TextEditingController(text: sale.addedDate ?? '');
 
@@ -572,10 +589,10 @@ class _TodaysalesState extends State<Todaysales> {
                         final firstSale = billSales.first;
                         final isExpanded = _expandedBills.contains(billKey);
 
-                        // Calculate totals
+                        // Calculate totals (use computed amounts to account for packets)
                         final totalAmount = billSales.fold<double>(
                           0,
-                          (sum, sale) => sum + (sale.amount ?? 0),
+                          (sum, sale) => sum + _computeSaleAmount(sale),
                         );
                         final totalItems = billSales.length;
 
@@ -909,7 +926,7 @@ class _TodaysalesState extends State<Todaysales> {
                                               SizedBox(
                                                 width: 50,
                                                 child: Text(
-                                                  '${((sale.quantityKg ?? 0) / 1000).toStringAsFixed(2)} kg',
+                                                  _computeQtyText(sale),
                                                   textAlign: TextAlign.center,
                                                   style: TextStyle(
                                                     fontSize: 12,
@@ -931,8 +948,9 @@ class _TodaysalesState extends State<Todaysales> {
                                               SizedBox(
                                                 width: 60,
                                                 child: Text(
-                                                  (sale.amount ?? 0)
-                                                      .toStringAsFixed(2),
+                                                  _computeSaleAmount(
+                                                    sale,
+                                                  ).toStringAsFixed(2),
                                                   textAlign: TextAlign.right,
                                                   style: TextStyle(
                                                     fontSize: 12,
