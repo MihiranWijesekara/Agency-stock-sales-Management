@@ -277,7 +277,7 @@ class _AllstockState extends State<Allstock> {
                               ),
                             ],
                           ),
-                          SizedBox(width: 120),
+                          SizedBox(width: 180),
                           Container(
                             decoration: BoxDecoration(
                               color: Colors.white.withOpacity(0.2),
@@ -301,21 +301,6 @@ class _AllstockState extends State<Allstock> {
                                   },
                                 );
                               },
-                            ),
-                          ),
-                          SizedBox(width: 5),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: IconButton(
-                              icon: const Icon(
-                                Icons.download,
-                                color: Colors.white,
-                                size: 20,
-                              ),
-                              onPressed: _downloadStockPdf,
                             ),
                           ),
                         ],
@@ -821,47 +806,5 @@ class _AllstockState extends State<Allstock> {
       'Dec',
     ];
     return months[month - 1];
-  }
-
-  Future<void> _downloadStockPdf() async {
-    final pdf = pw.Document();
-
-    // Create PDF content
-    pdf.addPage(
-      pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        build: (context) {
-          return [
-            pw.Text('Stock List', style: pw.TextStyle(fontSize: 24)),
-            pw.SizedBox(height: 20),
-            pw.Table.fromTextArray(
-              headers: [
-                'Item',
-                'QTY',
-                'Qty / Weight',
-                'Rate',
-                'Amount',
-                'Date',
-              ],
-              data: filteredStocks.map((stock) {
-                return [
-                  stock.item_name ?? '',
-
-                  _formatQuantity(stock),
-                  stock.stock_price.toString(),
-                  stock.amount?.toStringAsFixed(2) ?? 'N/A',
-                  stock.added_date ?? '',
-                ];
-              }).toList(),
-            ),
-          ];
-        },
-      ),
-    );
-
-    // Save PDF (opens share/save dialog)
-    await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => pdf.save(),
-    );
   }
 }
